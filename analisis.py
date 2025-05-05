@@ -9,59 +9,45 @@ import numpy as np
 class DatasetApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Análisis Dataset")
-        self.style = ttk.Style("flatly")  # Puedes cambiar el tema aquí
+        self.root.title("Analizador de Datasets")
+        self.root.geometry("1024x600")
+        self.root.minsize(900, 500)
+        self.style = ttk.Style("morph")
 
         self.df = None
         self.targets = None
         self.fdr_results = {}
         self.cross_correlation = None
         self.pearson = None
-        
-        #self.style
-        #self.style.configure("CustomText.TFrame", background="#dee2e6", borderwidth=1, relief="solid")
 
-        # Frame de botones
-        button_frame = ttk.Frame(root)
-        button_frame.pack(pady=10)
+        # Grupo de botones de acción
+        action_frame = ttk.Frame(root)
+        action_frame.pack(pady=10)
 
-        ttk.Button(button_frame, text="Abrir CSV", command=self.load_csv).grid(row=0, column=0, padx=5)
-        ttk.Button(button_frame, text="Seleccionar Target", command=self.select_target).grid(row=0, column=1, padx=5)
-        ttk.Button(button_frame, text="Eliminar Fila ➡️", command=self.drop_row).grid(row=0, column=2, padx=5)
-        ttk.Button(button_frame, text="Eliminar Columna ⬇️", command=self.drop_column).grid(row=0, column=3, padx=5)
+        ttk.Button(action_frame, text="Abrir CSV", command=self.load_csv).grid(row=0, column=0, padx=5)
+        ttk.Button(action_frame, text="Seleccionar Target", command=self.select_target).grid(row=0, column=1, padx=5)
+        ttk.Button(action_frame, text="Eliminar Fila", command=self.drop_row).grid(row=0, column=2, padx=5)
+        ttk.Button(action_frame, text="Eliminar Columna", command=self.drop_column).grid(row=0, column=3, padx=5)
+        ttk.Button(action_frame, text="Calcular FDR", command=self.compute_fdr, bootstyle=INFO).grid(row=1, column=0, padx=5, pady=5)
+        ttk.Button(action_frame, text="Coef. Pearson", command=self.compute_pearson_coef, bootstyle=INFO).grid(row=1, column=1, padx=5, pady=5)
+        ttk.Button(action_frame, text="Correlación Cruzada", command=self.compute_cross_correlation, bootstyle=INFO).grid(row=1, column=2, padx=5, pady=5)
 
-        ttk.Button(button_frame, text="Calcular FDR", command=self.compute_fdr, bootstyle=INFO).grid(row=1, column=0, padx=5)
-        ttk.Button(button_frame, text="Calcular Coeficiente de Pearson", command=self.compute_pearson_coef, bootstyle=INFO).grid(row=1, column=1, padx=5)
-        ttk.Button(button_frame, text="Calcular Correlación Cruzada", command=self.compute_cross_correlation, bootstyle=INFO).grid(row=1, column=2, padx=5)
+        # Notebook de pestañas para visualización
+        notebook = ttk.Notebook(root)
+        notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Área de visualización
-        text_frame = ttk.Frame(root)
-        text_frame.pack(pady=10)
+        self.tabs = {}
+        for name in ["Dataset", "Targets", "FDR", "Pearson", "Correlación Cruzada"]:
+            tab = ttk.Frame(notebook)
+            notebook.add(tab, text=name)
+            self.tabs[name] = tab
 
-        dataset_frame = ttk.Labelframe(text_frame, text="Dataset (Características)")
-        dataset_frame.grid(row=0, column=0, padx=10)
-        self.text = create_styled_scrolledtext(dataset_frame, width=100, height=10)
-        #self.text.pack()
-
-        target_frame = ttk.Labelframe(text_frame, text="Targets Seleccionados")
-        target_frame.grid(row=1, column=0, padx=10)
-        self.text_targets = create_styled_scrolledtext(target_frame, width=40, height=10)
-        #self.text_targets.pack()
-
-        fdr_frame = ttk.Labelframe(text_frame, text="Resultados del FDR")
-        fdr_frame.grid(row=1, column=1, padx=10)
-        self.text_fdr_results = create_styled_scrolledtext(fdr_frame, width=40, height=10)
-        #self.text_fdr_results.pack()
-
-        pearson_frame = ttk.Labelframe(text_frame, text="Resultados de Pearson")
-        pearson_frame.grid(row=2, column=0, padx=10)
-        self.text_pearson_results = create_styled_scrolledtext(pearson_frame, width=40, height=10)
-        #self.text_pearson_results.pack()
-
-        cross_frame = ttk.Labelframe(text_frame, text="Resultados de Correlación Cruzada")
-        cross_frame.grid(row=2, column=1, padx=10)
-        self.text_cross_results = create_styled_scrolledtext(cross_frame, width=40, height=10)
-        #self.text_cross_results.pack()
+        self.text_widgets = {}
+        for name in self.tabs:
+            frame = ttk.Frame(self.tabs[name], padding=10)
+            frame.pack(fill="both", expand=True)
+            self.text_widgets[name] = create_styled_scrolledtext(frame, width=120, height=20)
+            self.text_widgets[name].pack(fill="both", expand=True)
 
     def load_csv(self):
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
@@ -198,36 +184,28 @@ class DatasetApp:
 
     def display_dataframe(self):
         if self.df is not None:
-            self.text.delete("1.0", "end")
-            self.text.insert("end", self.df.to_string())
+            self.set_text("Dataset", self.df.to_string())
         if self.targets is not None:
-            self.text_targets.delete("1.0", "end")
-            self.text_targets.insert("end", self.targets.to_string())
-        else:
-            self.text_targets.delete("1.0", "end")
+            self.set_text("Targets", self.targets.to_string())
         if self.fdr_results:
-            self.text_fdr_results.delete("1.0", "end")
             df_fdr = pd.DataFrame(self.fdr_results, columns=["Característica", "FDR"])
             df_fdr["FDR"] = df_fdr["FDR"].round(4)
-            self.text_fdr_results.insert("end", df_fdr.to_string())
-        else:
-            self.text_fdr_results.delete("1.0", "end")
+            self.set_text("FDR", df_fdr.to_string(index=False))
         if self.pearson:
-            self.text_pearson_results.delete("1.0", "end")
             df_pearson = pd.DataFrame(self.pearson, columns=["Característica", "Pearson"])
             df_pearson["Pearson"] = df_pearson["Pearson"].round(4)
-            self.text_pearson_results.insert("end", df_pearson.drop_duplicates().to_string())
-        else:
-            self.text_pearson_results.delete("1.0", "end")
+            self.set_text("Pearson", df_pearson.drop_duplicates().to_string(index=False))
         if self.cross_correlation is not None:
-            self.text_cross_results.delete("1.0", "end")
             df_cross = pd.DataFrame({
                 "Característica": self.df.columns,
                 "Correlación Cruzada": np.round(self.cross_correlation, 4)
             })
-            self.text_cross_results.insert("end", df_cross.to_string(index=False))
-        else:
-            self.text_cross_results.delete("1.0", "end")
+            self.set_text("Correlación Cruzada", df_cross.to_string(index=False))
+
+    def set_text(self, tab_name, content):
+        widget = self.text_widgets[tab_name]
+        widget.delete("1.0", "end")
+        widget.insert("end", content)
 
     def resetAll(self):
         self.df = None
@@ -235,6 +213,8 @@ class DatasetApp:
         self.fdr_results = {}
         self.cross_correlation = None
         self.pearson = None
+        for widget in self.text_widgets.values():
+            widget.delete("1.0", "end")
 
 class CSVOptionsDialog:
     def __init__(self, parent):
@@ -266,26 +246,17 @@ class CSVOptionsDialog:
         self.top.destroy()
 
 def create_styled_scrolledtext(parent, width=40, height=10):
-    frame = ttk.Frame(parent, padding=1)  # elimina el estilo problemático
-    text_widget = tk.Text(
-        frame,
-        wrap="none",
-        width=width,
-        height=height,
-        background="#f8f9fa",
-        foreground="#212529",
-        insertbackground="black",
-        relief="flat",
-        font=("Segoe UI", 10)
-    )
-    text_widget.pack(side="left", fill="both", expand=True)
-    scroll = ttk.Scrollbar(frame, orient="vertical", command=text_widget.yview)
-    scroll.pack(side="right", fill="y")
+    text_widget = tk.Text(parent, wrap="none", width=width, height=height,
+                          background="#f8f9fa", foreground="#212529",
+                          insertbackground="black", relief="groove",
+                          font=("Segoe UI", 10), bd=2)
+    scroll = ttk.Scrollbar(parent, orient="vertical", command=text_widget.yview)
     text_widget.configure(yscrollcommand=scroll.set)
-    frame.pack()
+    text_widget.pack(side="left", fill="both", expand=True)
+    scroll.pack(side="right", fill="y")
     return text_widget
 
 if __name__ == "__main__":
-    root = ttk.Window(themename="flatly")
+    root = ttk.Window(themename="vapor")
     app = DatasetApp(root)
     root.mainloop()
